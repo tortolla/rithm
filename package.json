@@ -1,0 +1,40 @@
+{
+  "name": "rithm",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n api,web -c red,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "tsx watch apps/api/src/server.ts",
+    "dev:web": "vite --config apps/web/vite.config.ts",
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && tsc -p apps/api/tsconfig.json && vite build --config apps/web/vite.config.ts",
+    "start": "node dist/api/server.js",
+    "db:migrate": "tsx apps/api/src/db/migrate.ts",
+    "db:seed": "tsx apps/api/src/db/seed.ts",
+    "test": "vitest run --dir apps/api/src",
+    "typecheck": "tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.2",
+    "@fastify/static": "^10.1.7",
+    "fastify": "^5.6.1",
+    "grammy": "^1.38.3",
+    "lucide-react": "^0.468.0",
+    "postgres": "^3.4.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.11",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12",
+    "vitest": "^5.0.5"
+  }
+}
