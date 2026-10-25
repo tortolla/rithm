@@ -16,7 +16,10 @@ import { startBot } from './telegram/bot.js';
 import { startScheduler } from './telegram/scheduler.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
-await app.register(cors, { origin: config.NODE_ENV === 'development' });
+await app.register(cors, {
+  origin: config.NODE_ENV === 'development' ? true : new URL(config.PUBLIC_APP_URL).origin,
+  allowedHeaders: ['Content-Type', 'X-Telegram-Init-Data', 'X-Dev-Telegram-Id', 'ngrok-skip-browser-warning']
+});
 
 const webRoot = resolve(process.cwd(), 'dist/web');
 if (existsSync(webRoot)) {

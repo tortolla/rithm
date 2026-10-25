@@ -19,12 +19,15 @@ const telegram = window.Telegram?.WebApp;
 telegram?.ready();
 telegram?.expand();
 
+const apiBaseUrl = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers);
   headers.set('Content-Type', 'application/json');
+  if (apiBaseUrl.includes('.ngrok-free.')) headers.set('ngrok-skip-browser-warning', '1');
   if (telegram?.initData) headers.set('X-Telegram-Init-Data', telegram.initData);
   else headers.set('X-Dev-Telegram-Id', localStorage.getItem('rithm-dev-id') ?? '100000001');
-  const response = await fetch(path, { ...options, headers });
+  const response = await fetch(`${apiBaseUrl}${path}`, { ...options, headers });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error ?? 'Не удалось выполнить запрос');

@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   root: resolve(import.meta.dirname),
+  base: process.env.VITE_BASE_PATH || '/',
   plugins: [react()],
   server: {
     port: 5173,
