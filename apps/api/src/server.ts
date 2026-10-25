@@ -184,6 +184,37 @@ app.post('/api/habits/:id/action', async (request, reply) => {
   }
 });
 
+const habitUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(100).optional(),
+  description: z.string().trim().max(300).optional(),
+  scheduleDays: z.array(z.number().int().min(1).max(7)).min(1).max(7).optional(),
+  reminderEnabled: z.boolean().optional(),
+  reminderTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional()
+}).refine((value) => Object.keys(value).length > 0);
+
+app.patch('/api/habits/:id', async (request, reply) => {
+  const params = z.object({ id: z.string().uuid() }).safeParse(request.params);
+  const body = habitUpdateSchema.safeParse(request.body);
+  if (!params.success || !body.success) return reply.code(400).send({ error: 'Проверьте настройки привычки' });
+  const [current] = await sql`
+    SELECT sh.* FROM sprint_habits sh JOIN sprints s ON s.id = sh.sprint_id
+    WHERE sh.id = ${params.data.id} AND s.user_id = ${request.appUser.id} AND s.status = 'active'
+  `;
+  if (!current) return reply.code(404).send({ error: 'Привычка не найдена' });
+  const value = body.data;
+  const [updated] = await sql`
+    UPDATE sprint_habits SET
+      name = ${value.name ?? current.name},
+      description = ${value.description ?? current.description},
+      schedule_days = ${value.scheduleDays ? sql.array([...new Set(value.scheduleDays)].sort(), 21) : current.scheduleDays},
+      reminder_enabled = ${value.reminderEnabled ?? current.reminderEnabled},
+      reminder_time = ${value.reminderTime ?? current.reminderTime}
+    WHERE id = ${current.id}
+    RETURNING *
+  `;
+  return updated;
+});
+
 app.get('/api/stats', async (request) => getStats(request.appUser.id, request.appUser.timezone));
 
 const ideaSchema = z.object({

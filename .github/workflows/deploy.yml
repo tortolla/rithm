@@ -1,0 +1,76 @@
+name: Deploy RITHM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: rithm-production
+  cancel-in-progress: false
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify application
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+          npm audit --omit=dev --audit-level=high
+
+      - name: Prepare release
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          umask 077
+          printf '%s\n' \
+            "BOT_TOKEN=$BOT_TOKEN" \
+            "APP_DOMAIN=$APP_DOMAIN" \
+            "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" > production.env
+          tar --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='production.env' -czf rithm-release.tgz .
+
+      - name: Install SSH client helper
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+
+      - name: Upload and start production
+        env:
+          SSHPASS: ${{ secrets.SERVER_PASSWORD }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh_opts='-o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=15'
+          sshpass -e ssh $ssh_opts "$SERVER_USER@$SERVER_HOST" 'mkdir -p /opt/rithm'
+          sshpass -e scp $ssh_opts rithm-release.tgz production.env "$SERVER_USER@$SERVER_HOST:/tmp/"
+          sshpass -e ssh $ssh_opts "$SERVER_USER@$SERVER_HOST" '
+            set -eu
+            tar -xzf /tmp/rithm-release.tgz -C /opt/rithm
+            install -m 600 /tmp/production.env /opt/rithm/.env
+            cd /opt/rithm
+            docker compose up -d --build --remove-orphans
+            docker compose ps
+          '
+
+      - name: Verify public health check
+        env:
+          APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
+        run: |
+          for attempt in $(seq 1 24); do
+            if curl --fail --silent --show-error --max-time 10 "https://$APP_DOMAIN/api/health"; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1

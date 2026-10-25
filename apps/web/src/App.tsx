@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ArrowRight, Bell, BookOpen, CalendarDays, Check, ChevronLeft, Circle, Clock3,
-  Home, Lightbulb, LoaderCircle, MoreHorizontal, Plus, RotateCcw, Settings,
+  Home, Lightbulb, LoaderCircle, MoreHorizontal, Pencil, Plus, RotateCcw, Settings,
   Sparkles, TrendingUp, Trash2, X
 } from 'lucide-react';
 import { api, haptic } from './api';
@@ -231,6 +231,7 @@ function Dashboard({ data, refresh }: { data: Bootstrap; refresh: () => Promise<
   const [stats, setStats] = useState<Stats | null>(null);
   const [busy, setBusy] = useState('');
   const [toast, setToast] = useState('');
+  const [completion, setCompletion] = useState<Stats | null>(null);
   const sprint = data.sprint!;
 
   const loadStats = async () => setStats(await api.stats());
@@ -248,13 +249,15 @@ function Dashboard({ data, refresh }: { data: Bootstrap; refresh: () => Promise<
     finally { setBusy(''); }
   };
 
+  if (completion) return <CompletionView stats={completion} onNext={refresh} />;
+
   return <main className="app-shell">
     <header className="app-header"><Logo /><div><button onClick={() => setTab('more')} aria-label="Настройки"><Settings size={23} /></button></div></header>
     {tab === 'today' && <Today sprint={sprint} quote={data.quote} action={action} busy={busy} />}
     {tab === 'calendar' && <CalendarView sprint={sprint} stats={stats} />}
     {tab === 'progress' && <ProgressView stats={stats} />}
     {tab === 'ideas' && <IdeasView ideas={data.ideas} catalog={data.catalog} refresh={refresh} />}
-    {tab === 'more' && <MoreView data={data} refresh={refresh} />}
+    {tab === 'more' && <MoreView data={data} refresh={refresh} onCompleted={setCompletion} />}
     <BottomNav tab={tab} setTab={setTab} />
     {toast && <button className="toast" onClick={() => setToast('')}><X size={17} /><span>{toast}</span></button>}
   </main>;
@@ -312,20 +315,49 @@ function IdeasView({ ideas, catalog, refresh }: { ideas: Idea[]; catalog: Direct
   const addTemplate = async (habit: HabitTemplate) => { await api.addIdea({ title: habit.name, description: habit.description, directionId: habit.directionId, templateId: habit.id }); await refresh(); };
   return <section className="tab-content"><div className="eyebrow">БЕЗ ДЕДЛАЙНОВ И ОБЯЗАТЕЛЬСТВ</div><h1>Хочу<br />попробовать</h1><p className="lead">Личная коллекция идей на будущее. Здесь ничего не нужно успевать.</p>
     <form className="idea-form" onSubmit={add}><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, начать рисовать" /><button disabled={saving}><Plus /></button></form>
-    <div className="ideas-list">{ideas.map((idea) => <div key={idea.id}><Lightbulb size={20} /><div><strong>{idea.title}</strong><small>{idea.description}</small></div><button onClick={async () => { await api.deleteIdea(idea.id); await refresh(); }} aria-label="Удалить"><Trash2 size={18} /></button></div>)}</div>
+    <div className="ideas-list">{ideas.map((idea) => <div key={idea.id}><Lightbulb size={20} /><div><strong>{idea.title}</strong><small>{idea.description}</small></div><button onClick={async () => { const next = prompt('Название идеи', idea.title)?.trim(); if (next && next !== idea.title) { await api.updateIdea(idea.id, { title: next, description: idea.description, directionId: idea.directionId ?? null }); await refresh(); } }} aria-label="Редактировать"><Pencil size={17} /></button><button onClick={async () => { await api.deleteIdea(idea.id); await refresh(); }} aria-label="Удалить"><Trash2 size={18} /></button></div>)}</div>
     {!ideas.length && <div className="empty-state"><Lightbulb /><h3>Пока здесь пусто</h3><p>Добавляй всё, что однажды хочется попробовать.</p></div>}
     <h2>Идеи из каталога</h2><div className="suggestion-chips">{catalog.slice(0, 6).flatMap((direction) => direction.habits.slice(0, 1)).map((habit) => <button key={habit.id} onClick={() => addTemplate(habit)}><Plus size={15} />{habit.name}</button>)}</div>
   </section>;
 }
 
-function MoreView({ data, refresh }: { data: Bootstrap; refresh: () => Promise<void> }) {
+function MoreView({ data, refresh, onCompleted }: { data: Bootstrap; refresh: () => Promise<void>; onCompleted: (stats: Stats) => void }) {
   const [ending, setEnding] = useState(false);
-  const finish = async () => { if (!confirm('Завершить текущий спринт? История сохранится.')) return; setEnding(true); try { await api.completeSprint(); await refresh(); } finally { setEnding(false); } };
+  const finish = async () => { if (!confirm('Завершить текущий спринт? История сохранится.')) return; setEnding(true); try { const result = await api.completeSprint(); onCompleted(result.stats); } finally { setEnding(false); } };
   return <section className="tab-content"><div className="eyebrow">ТВОЯ СИСТЕМА</div><h1>Ещё</h1><div className="profile-card"><span>{data.user.firstName.slice(0,1).toUpperCase()}</span><div><strong>{data.user.firstName}</strong><small>{data.user.timezone}</small></div></div>
     <div className="more-list"><div><Bell /><span><strong>Напоминания</strong><small>Включены для выбранных привычек</small></span></div><div><Clock3 /><span><strong>Вечерний check-in</strong><small>Каждый день в 21:30</small></span></div><div><TrendingUp /><span><strong>Недельный отчёт</strong><small>По воскресеньям</small></span></div></div>
+    <h2>Настройки привычек</h2><div className="edit-habits">{data.sprint?.habits.map((habit) => <EditHabit key={habit.id} habit={habit} refresh={refresh} />)}</div>
     <div className="about-card"><div className="eyebrow">О РИТМЕ</div><h2>Большие изменения начинаются с маленьких шагов.</h2><p>Приложение создала Настя Сычёва, чтобы двигаться к изменениям без перегруза и постоянного чувства, что что-то не успеваешь.</p></div>
     <button className="danger-button" onClick={finish} disabled={ending}>{ending ? 'Завершаем…' : 'Завершить текущий спринт'}</button>
   </section>;
+}
+
+function EditHabit({ habit, refresh }: { habit: SprintHabit; refresh: () => Promise<void> }) {
+  const [days, setDays] = useState(habit.scheduleDays);
+  const [time, setTime] = useState(habit.reminderTime.slice(0, 5));
+  const [enabled, setEnabled] = useState(habit.reminderEnabled);
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (!days.length) return;
+    setSaving(true);
+    try { await api.updateHabit(habit.id, { scheduleDays: days, reminderTime: time, reminderEnabled: enabled }); await refresh(); haptic('medium'); }
+    finally { setSaving(false); }
+  };
+  return <details className="edit-habit"><summary><span style={{ background: habit.color }}>{habit.emoji}</span><div><strong>{habit.name}</strong><small>{habit.scheduleDays.length === 7 ? 'Каждый день' : habit.scheduleDays.map((day) => weekdayNames[day - 1]).join(', ')} · {habit.reminderTime.slice(0,5)}</small></div><Settings size={18} /></summary><div className="edit-habit-body">
+    <div className="days-picker">{weekdayNames.map((label, index) => { const value = index + 1; return <button className={days.includes(value) ? 'selected' : ''} key={label} onClick={() => setDays(days.includes(value) ? days.filter((day) => day !== value) : [...days, value].sort())}>{label}</button>; })}</div>
+    <label className="toggle-row"><span><Bell size={18} />Напоминать</span><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /></label>
+    {enabled && <label className="time-row"><Clock3 size={18} /><input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>}
+    <button className="save-button" onClick={save} disabled={saving || !days.length}>{saving ? 'Сохраняем…' : 'Сохранить'}</button>
+  </div></details>;
+}
+
+function CompletionView({ stats, onNext }: { stats: Stats; onNext: () => Promise<void> }) {
+  return <main className="completion-screen"><div className="completion-top"><Logo inverse /><Sparkles /></div><div><div className="eyebrow light-text">СПРИНТ ЗАВЕРШЁН</div><h1>Ты прошла<br />свой спринт.</h1><p>Это не оценка и не экзамен. Это момент заметить, что получилось и что хочется взять с собой дальше.</p></div>
+    <div className="completion-score"><strong>{stats.totals.percent}%</strong><span>{stats.totals.done} из {stats.totals.planned} запланированных действий</span></div>
+    <div className="completion-habits">{stats.habits.map((habit) => <div key={habit.id}><span>{habit.name}</span><strong>{habit.done} из {habit.planned}</strong></div>)}</div>
+    <p className="completion-note">Не обязательно менять всё сразу. Ты уже лучше понимаешь, какие маленькие действия подходят твоей жизни.</p>
+    <PrimaryButton light onClick={() => void onNext()}>Создать следующий спринт</PrimaryButton>
+  </main>;
 }
 
 function BottomNav({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {

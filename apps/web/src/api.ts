@@ -38,10 +38,12 @@ export const api = {
   settings: (body: object) => request('/api/settings', { method: 'PATCH', body: JSON.stringify(body) }),
   createSprint: (body: object) => request('/api/sprints', { method: 'POST', body: JSON.stringify(body) }),
   habitAction: (id: string, body: object) => request<{ quote?: string }>(`/api/habits/${id}/action`, { method: 'POST', body: JSON.stringify(body) }),
+  updateHabit: (id: string, body: object) => request(`/api/habits/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   stats: () => request<Stats | null>('/api/stats'),
   addIdea: (body: object) => request('/api/ideas', { method: 'POST', body: JSON.stringify(body) }),
+  updateIdea: (id: string, body: object) => request(`/api/ideas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteIdea: (id: string) => request(`/api/ideas/${id}`, { method: 'DELETE' }),
-  completeSprint: () => request('/api/sprints/current/complete', { method: 'POST' })
+  completeSprint: () => request<{ stats: Stats }>('/api/sprints/current/complete', { method: 'POST' })
 };
 
 export function haptic(type: 'light' | 'medium' | 'heavy' = 'light') {
