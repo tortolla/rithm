@@ -70,7 +70,7 @@ function Onboarding({ data, onCreated }: { data: Bootstrap; onCreated: () => Pro
     <PrimaryButton onClick={() => setScreen('wizard')}>Выбрать направления</PrimaryButton>
   </main>;
 
-  return <SprintWizard catalog={data.catalog} onCreated={onCreated} />;
+  return <SprintWizard catalog={data.catalog} ideas={data.ideas} onCreated={onCreated} />;
 }
 
 type DraftHabit = {
@@ -83,7 +83,7 @@ type DraftHabit = {
   reminderTime: string;
 };
 
-function SprintWizard({ catalog, onCreated }: { catalog: Direction[]; onCreated: () => Promise<void> }) {
+function SprintWizard({ catalog, ideas, onCreated }: { catalog: Direction[]; ideas: Idea[]; onCreated: () => Promise<void> }) {
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [habits, setHabits] = useState<Record<string, DraftHabit>>({});
@@ -172,7 +172,7 @@ function SprintWizard({ catalog, onCreated }: { catalog: Direction[]; onCreated:
       <h1>Выбери первую<br />привычку.</h1>
       <p className="lead muted-light">По одной привычке на каждое направление. Позже их можно будет изменить.</p>
       <div className="habit-groups">
-        {chosenDirections.map((direction) => <HabitChooser key={direction.id} direction={direction} selected={habits[direction.id]} onChoose={chooseHabit} />)}
+        {chosenDirections.map((direction) => <HabitChooser key={direction.id} direction={direction} ideas={ideas.filter((idea) => !idea.directionId || idea.directionId === direction.id)} selected={habits[direction.id]} onChoose={chooseHabit} />)}
       </div>
     </section>}
 
@@ -204,11 +204,12 @@ function SprintWizard({ catalog, onCreated }: { catalog: Direction[]; onCreated:
   </main>;
 }
 
-function HabitChooser({ direction, selected, onChoose }: { direction: Direction; selected?: DraftHabit; onChoose: (direction: Direction, template?: HabitTemplate, customName?: string) => void }) {
+function HabitChooser({ direction, ideas, selected, onChoose }: { direction: Direction; ideas: Idea[]; selected?: DraftHabit; onChoose: (direction: Direction, template?: HabitTemplate, customName?: string) => void }) {
   const [custom, setCustom] = useState('');
   return <div className="habit-group">
     <h2><span>{direction.emoji}</span>{direction.name}</h2>
     {direction.habits.map((habit) => <button key={habit.id} className={`habit-option ${selected?.templateId === habit.id ? 'selected' : ''}`} onClick={() => onChoose(direction, habit)}><div><strong>{habit.name}</strong><small>{habit.description}</small></div><span className="round-check">{selected?.templateId === habit.id ? <Check size={17} /> : null}</span></button>)}
+    {ideas.length > 0 && <div className="saved-ideas"><span>ИЗ «ХОЧУ ПОПРОБОВАТЬ»</span>{ideas.map((idea) => <button key={idea.id} className={`habit-option ${selected && !selected.templateId && selected.name === idea.title ? 'selected' : ''}`} onClick={() => onChoose(direction, undefined, idea.title)}><div><strong>{idea.title}</strong><small>{idea.description || 'Сохранённая идея'}</small></div><span className="round-check">{selected && !selected.templateId && selected.name === idea.title ? <Check size={17} /> : null}</span></button>)}</div>}
     <form className={`custom-habit ${selected && !selected.templateId ? 'selected' : ''}`} onSubmit={(e) => { e.preventDefault(); if (custom.trim()) onChoose(direction, undefined, custom.trim()); }}>
       <Plus size={19} /><input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Создать свою привычку" maxLength={100} /><button type="submit">Добавить</button>
     </form>

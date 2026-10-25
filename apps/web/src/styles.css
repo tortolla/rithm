@@ -82,6 +82,8 @@ h2 { font-size: 1.25rem; }
 .round-check { width: 29px; height: 29px; border: 1px solid rgba(255,255,255,.65); border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; }
 .habit-option.selected { background: rgba(145,29,18,.3); border-color: rgba(203,75,57,.7); }
 .habit-option.selected .round-check { background: #d9efb6; color: #171310; border-color: #d9efb6; }
+.saved-ideas { margin: 18px 0 10px; }
+.saved-ideas > span { display: block; margin-bottom: 9px; color: rgba(255,255,255,.45); font-size: .6rem; letter-spacing: .2em; }
 .custom-habit { display: flex; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid rgba(255,255,255,.14); min-height: 55px; border-radius: 15px; }
 .custom-habit input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: white; }
 .custom-habit input::placeholder { color: rgba(255,255,255,.45); }
